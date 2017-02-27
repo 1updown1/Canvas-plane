@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="UTF-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0">
+		<title></title>
+		<style type="text/css">
+			*{
+				margin: 0;
+				padding: 0;
+			}
+			#cv{
+				width: 100%;
+				height: 100%;
+				box-shadow:  0 0 3px saddlebrown;
+				/*background: url(../img/img4/background.png) center/100% 100% no-repeat;*/
+			}
+			#load{
+				width: 10px;
+				height: 10px;
+				background: red;
+				position: absolute;
+				top: 0;
+				left: 0;
+			}
+		</style>
+	</head>
+	<body>
+		<canvas id="cv" width="320" height="568"></canvas>
+		<div id="load">
+			
+		</div>
+	</body>
+	<script type="text/javascript">
+		var loadT = document.getElementById('load');
+		var canvas = document.getElementById('cv');
+		var context = canvas.getContext('2d');
+		var deg = Math.PI/180;
+		var hited = false; 
+		var score = 0;
+		
+		//随机数
+		function randomNum(min,max){
+			return parseInt(Math.random()*(max-min+1)+min);
+		}
+		
+		loading({
+			'bg':'../img/img4/background.png',
+			'hero':'../img/img4/herofly.png',
+			'bullet1':'../img/img4/bullet1.png',
+			'bullet2':'../img/img4/bullet2.png',
+			'enemy1':'../img/img4/enemy1.png',
+			'enemy2':'../img/img4/enemy2.png',
+			'enemy3':'../img/img4/enemy3.png',
+			'bomb':'../img/img4/bomb.png',
+			'prop':'../img/img4/prop.png'
+		},{
+			success:main,
+			load:load
+		});
+		//预加载方法
+		function loading(imgObj,obj){
+			var length = 0;
+			for (var keys in imgObj) {
+				length++;
+			}
+			var num = 0;
+			var imgO = {};
+			for (var keys in imgObj) {
+				var img = new Image();
+				img.src = imgObj[keys];
+					img.onload = (function(keyy,img){
+						//console.log(this);  // -->this为window
+						return function(){
+									num++;
+									imgO[keyy] = this;  // -->this为触发onload的img
+//									imgO[keyy] = img;
+									var loads = num/length;
+									if(obj.load){
+										obj.load(loads);
+									}
+									if (num >= length) {
+										if (obj.success) {
+											obj.success(imgO);
+										}
+									}
+								}
+					})(keys,img);
+			}
+		}
+		//预加载方法能够帮我们实现，图片的加载以及加载完成后调用我们想要执行的方法，并有进度传递
+		
+		//载入进度
+		function load(loads){
+			loadT.innerText = loads ;
+		}
+		//进入游戏主方法：通过重复创建敌机对象，并保存在数组，来生成敌机并使其移动。同样创建子弹
+		function main(img){
+			var cWidth = document.documentElement.clientWidth || document.body.clientWidth;
+			var cHeight = document.documentElement.clientHeight || document.body.clientHeight;
+			canvas.height = cHeight;
+			canvas.width = cWidth;
+			//产生控制机
+			function Hero(){
+				this.img = img.hero;
+				this.x = canvas.width/2 - this.img.width/5/2;
+				this.y = canvas.height - this.img.height*1.5;
+				this.w = this.img.width/5;
+				this.h = this.img.height;
+				this.index = 0;
+				this.godie = false;
+			}
+			Hero.prototype.draw = function(){
+				context.drawImage(this.img,this.index*this.w,0,this.img.width/5,this.img.height,this.x,this.y,this.w,this.h);
+			}
+			var hero = new Hero();
+			hero.draw();
+			//产生子弹2
+			function Bullet2(){
+				this.img = img.bullet2;
+				this.w = this.img.width;
+				this.h = this.img.height;
+				this.x = (hero.w - this.w)/2 + hero.x;
+				this.y = hero.y - this.h*2;
+				this.speedY = 4;
+				this.p = 2;
+				this.hited = false;
+			}
+			Bullet2.prototype.draw = function(){
+				context.drawImage(this.img,this.x,this.y);
+			}
+			Bullet2.prototype.move = function(){
+				this.y -= this.speedY;
+			}
+			//产生子弹1
+			function Bullet1(){
+				Bullet2.call(this);
+				this.img = img.bullet1;
+				this.w = this.img.width;
+				this.h = this.img.height;
+				this.x = (hero.w - this.w)/2 + hero.x;
+				this.y = hero.y - this.h*2;
+				this.p = 1;
+			}
+			Bullet1.prototype = Bullet2.prototype;
+			//随机产生敌机的类型，并赋予不同属性值
+			function Enemy(){
+				var num = randomNum(1,20);
+				if (num>=1&&num<=10) {
+					this.img = img.enemy1;
+					this.w = this.img.width/5;
+					this.hp = 1;
+					this.speed = 8;
+				} else if(num>=11&&num<=15){
+					this.img = img.enemy3;
+					this.w = this.img.width/6;
+					this.hp = 4;
+					this.speed = 4;
+				}else{
+					this.img = img.enemy2;
+					this.w = this.img.width/10;
+					this.hp = 15;
+					this.speed = 2;
+				}
+				this.h = this.img.height;
+				this.x = randomNum(0,canvas.width-this.w);
+				this.y = -this.h;
+				this.buffx = 0;
+			}
+			Enemy.prototype.draw = function(){
+				context.drawImage(this.img,this.buffx,0,this.w,this.h,this.x,this.y,this.w,this.h);
+			}
+			Enemy.prototype.move = function(){
+				this.y += this.speed;
+			}
+			//产生补给
+			function Help(){
+				this.img = img.prop;
+				this.w = this.img.width/3;
+				this.h = this.img.height;
+				this.x = randomNum(0,canvas.width-this.w);
+				this.y = -this.h;
+				this.d = Math.random()>0.5?true:false;
+				this.index = randomNum(0,2);
+			}
+			Help.prototype.draw = function(){
+				context.drawImage(this.img,this.index*this.w,0,this.w,this.h,this.x,this.y,this.w,this.h);
+			}
+			Help.prototype.move = function(){
+				if (this.d) {
+					this.x += randomNum(1,3);
+					if (this.x >= canvas.width-this.w) {
+						this.d = false;
+					}
+				} else{
+					this.x -= randomNum(1,3);
+					if (this.x <= 0) {
+						this.d = true;
+					}
+				}
+				
+				this.y += randomNum(1,3);
+			}
+			function Bomb(){
+				this.img = img.bomb;
+				this.w = this.img.width;
+				this.h = this.img.height;
+				this.x = 0;
+				this.y = canvas.height - this.h;
+				this.num = 1;
+			}
+			Bomb.prototype.draw = function(){
+				context.drawImage(this.img,this.x,this.y);
+				context.beginPath();
+				context.fillStyle = 'transparent';
+				context.rect(this.x,this.y,this.w,this.h);
+				context.fill();
+			}
+			
+			var bulletArr = [];	//保存子弹
+			var enemyArr = [];	//保存敌机
+			var overflyArr = [];	//保存被击毁的敌机
+			var timer = 0;		//游戏缓冲机制
+			var help ;			//产生补给
+			var boom = new Bomb();//炸弹图
+			var isDoubleB = false;//子弹类型是否双子弹
+			var bulletSpeed = 15;//子弹射出速度
+			var emenySpeed = 60;//敌机出现速度
+			//判断是否击中(双子弹)
+			function isHit(bullet,enemy){
+				var i1 = bullet.x + 6 >enemy.x;
+				var i2 = bullet.x<enemy.x+enemy.w;
+				var i3 = bullet.y+bullet.h>enemy.y;
+				var i4 = bullet.y<enemy.y+enemy.h;
+				var i5 = bullet.x + bullet.w >enemy.x;
+				var i6 = bullet.x + bullet.w - 6 <enemy.x+enemy.w;
+				if ((i1&&i2&&i3&&i4)||(i5&&i6&&i3&&i4)) {
+					enemy.hp -= bullet.p;
+					if (enemy.hp<=0) {
+						enemy.hited = true;
+						enemy.speed = 0;
+						enemy.buffx += enemy.w;
+					}
+					return true;
+				}
+				return false;
+			}
+			//判断是否击中
+			function isHitNormal(obj1,obj2,isPX){
+				var i1 = obj1.x + obj1.w >obj2.x;
+				var i2 = obj1.x<obj2.x+obj2.w;
+				var i3 = obj1.y+obj1.h>obj2.y;
+				var i4 = obj1.y<obj2.y+obj2.h;
+				if (i1&&i2&&i3&&i4) {
+					if(isPX){
+						if (pxJudgeHit(obj1,obj2)) {
+							return true;
+						}
+					}else{
+						return true;
+					}
+					
+				}
+				return false;
+			}
+			function pxJudgeHit(obj1,obj2){
+				var minx = obj1.x>obj2.x?obj1.x:obj2.x;
+				var miny = obj1.y>obj2.y?obj1.y:obj2.y;
+				var maxx = obj1.x + obj1.w < obj2.x + obj2.w? obj1.x + obj1.w: obj2.x + obj2.w;
+				var maxy = obj1.y + obj1.h < obj2.y + obj2.h? obj1.y + obj1.h: obj2.y + obj2.h;
+				
+				context.clearRect(0,0,canvas.width,canvas.height);
+				context.drawImage(obj1.img,obj1.x,obj1.y);
+				var data1 = context.getImageData(minx,miny,maxx-minx,maxy-miny).data;
+				
+				context.clearRect(0,0,canvas.width,canvas.height);
+				context.drawImage(obj2.img,obj2.x,obj2.y);
+				var data2 = context.getImageData(minx,miny,maxx-minx,maxy-miny).data;
+				
+				for (var e=3;e<data1.length;e+=4) {
+					if (data1[e]>0&&data2[e]>0) {
+						return true;
+					}
+				}
+				return false;
+			}
+			//形成动画
+			function ani(){
+				for (var i=0;i<enemyArr.length;i++) {
+					if(isHitNormal(hero,enemyArr[i],true)){
+						hero.godie = true;
+						canvas.ontouchmove = null;
+					}
+				}
+				if (hero.godie) {
+					if (timer%8 == 0) {
+				   		hero.index += 1;
+					}
+				}
+				context.clearRect(0,0,canvas.width,canvas.height);
+				if (timer>=canvas.height) {
+				    timer = 0;
+				}
+				//2张背景图形成移动
+				context.drawImage(img.bg,0,timer,canvas.width,canvas.height);
+				context.drawImage(img.bg,0,timer-canvas.height,canvas.width,canvas.height);
+				//敌机创建
+				if (timer%emenySpeed == 0 && !hero.godie) {
+					var enemy = new Enemy();
+					enemyArr.push(enemy);
+				}
+				for (var i=0;i<enemyArr.length;i++) {
+					if (enemyArr[i].y > canvas.height) {
+						enemyArr.splice(i,1);
+						i--;
+						continue;
+					}
+					enemyArr[i].draw();
+					if (!hero.godie) {
+						enemyArr[i].move();
+					} 
+				}
+				//子弹
+				if (timer%bulletSpeed == 0) {
+					if (!hero.godie&&!isDoubleB) {
+						var bullet1 = new Bullet1();
+						bulletArr.push(bullet1);
+					}else if(!hero.godie){
+						var bullet2 = new Bullet2();
+						bulletArr.push(bullet2);
+					}
+				}
+				for (var i=0;i<bulletArr.length;i++) {
+					hited = false;
+					if(bulletArr[i].y <= -bulletArr[i].h){
+						bulletArr.splice(i,1);
+						i--;
+						continue;
+					}
+					for(var k=0;k<enemyArr.length;k++) {
+						if(isHit(bulletArr[i],enemyArr[k])){
+							bulletArr.splice(i,1);
+							i--;
+							hited = true;
+							if (enemyArr[k].hited) {
+								if(/enemy1/.test(enemyArr[k].img.src)){
+									score += 10;
+								}else if(/enemy2/.test(enemyArr[k].img.src)){
+									score += 100;
+								}else{
+									score += 50;
+								}
+								overflyArr.push(enemyArr.splice(k,1)[0]);
+								k--;
+							}
+							break;
+						}
+					}
+					if(!hited){
+						bulletArr[i].draw();
+						if (!hero.godie) {
+							bulletArr[i].move();
+						}
+					}
+				}
+				//敌机gg
+				if (timer%2 == 0) {
+					for (var i=0;i<overflyArr.length;i++) {
+						overflyArr[i].buffx += overflyArr[i].w;
+						overflyArr[i].draw();
+						if (overflyArr[i].buffx >= overflyArr[i].img.width) {
+							overflyArr.splice(i,1);
+							i--;
+						}
+					}
+				}else{
+					for (var i=0;i<overflyArr.length;i++) {
+						overflyArr[i].draw();
+					}
+				}
+				//生成补给
+//				console.log(timer%8000)
+				if (timer%8000 == 200) {
+					help = new Help();
+					if(emenySpeed>10){
+						emenySpeed--;
+					}
+				}
+				if (help) {
+					help.draw();
+					help.move();
+					if (isHitNormal(help,hero,false)) {
+						switch(help.index){
+							case 0: boom.num +=1;break;
+							case 1: if(!isDoubleB){isDoubleB = true}else if(bulletSpeed>1){bulletSpeed -=1};break;
+							case 2:boom.num +=1;break;
+						}
+						help = null;
+					}
+				}
+				boom.draw();
+				hero.draw();
+//				context.font = 'italic 30px SimHei';
+				context.font = 'italic 30px STLiti';
+				context.lineWidth = 1;
+				context.fillStyle = 'black';
+				context.fillText('SCORE: '+score,0,25);
+				context.font = 'normal 30px YouYuan';
+				context.fillText('X '+ boom.num,boom.w*1.5,canvas.height-boom.h*0.2);
+//				if (!hero.godie) {
+					timer++;
+//				}
+				window.requestAnimationFrame(ani);
+			}
+			ani();
+			
+			//touch事件
+			canvas.addEventListener('touchmove',function(e){
+				var ev = e || window.event;
+				ev.preventDefault();
+				var x = ev.touches[0].clientX;
+				var y = ev.touches[0].clientY;
+				hero.x = x - hero.w/2;
+				hero.y = y - 1.1*hero.h;
+			},false);
+			
+			canvas.addEventListener('touchstart',function(e){
+				var ev = e || window.event;
+				ev.preventDefault();
+				var x = ev.touches[0].clientX;
+				var y = ev.touches[0].clientY;
+				if(context.isPointInPath(x,y)&&boom.num>0){
+					while(enemyArr[0]){
+						overflyArr.push(enemyArr.splice(0,1)[0]);
+					}
+					boom.num -=1;
+				}
+			},false);
+			
+			
+			
+//			canvas.ontouchmove = function(e){
+//				var ev = e || window.event;
+//				ev.preventDefault();
+//				var x = ev.touches[0].clientX;
+//				var y = ev.touches[0].clientY;
+//				hero.x = x - hero.w/2;
+//				hero.y = y - 1.3*hero.h;
+//			}
+			
+		}
+		
+		
+	</script>
+</html>
+
